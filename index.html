@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -46,7 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full relative">
+        <button id="testBeep" class="absolute top-4 right-4 text-blue-400 hover:text-blue-300 focus:outline-none" title="Test Beep Sound">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707a1 1 0 011.414 0l.707.707a1 1 0 000 1.414L9.414 9H13a1 1 0 011 1v4a1 1 0 01-1 1H9.414l2.293 2.293a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414 0L5.586 15z" />
+            </svg>
+        </button>
         <h1 class="text-2xl font-bold text-center mb-4">15-Minute Alarm</h1>
         <p class="text-center text-gray-300 mb-4">Beep 1 minute before each 15-minute mark, then every 2 seconds for the last 10 seconds.</p>
         <div class="grid grid-cols-2 gap-4">
@@ -66,9 +32,13 @@
     </div>
 
     <script>
-        // Create audio objects for soft and regular beeps
-        const softBeep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
-        const regularBeep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+        // Create audio object for beep
+        const beep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+
+        // Test beep button
+        document.getElementById('testBeep').addEventListener('click', () => {
+            beep.play();
+        });
 
         // Function to format time as 12-hour HH:MM:SS AM/PM
         function formatTime(date) {
@@ -117,14 +87,14 @@
 
             // Check if it's 1 minute before the 15-minute mark (e.g., 14:00, 29:00, 44:00, 59:00)
             if ((minutes % 15 === 14 && seconds === 0)) {
-                softBeep.play();
+                beep.play();
             }
 
             // Check if it's within the last 10 seconds of the 15-minute mark (e.g., 14:50-14:59)
             if ((minutes % 15 === 14 && seconds >= 50)) {
                 // Play beep every 2 seconds (50, 52, 54, 56, 58)
                 if (seconds % 2 === 0) {
-                    regularBeep.play();
+                    beep.play();
                 }
             }
         }
