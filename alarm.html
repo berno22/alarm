@@ -1,0 +1,142 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15-Minute Alarm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+        <h1 class="text-2xl font-bold text-center mb-4">15-Minute Alarm</h1>
+        <p class="text-center text-gray-300 mb-4">Beep 1 minute before each 15-minute mark, then every 2 seconds for the last 10 seconds.</p>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="text-center">
+                <p class="text-lg font-semibold">Current Time</p>
+                <p id="currentTime" class="text-xl font-mono text-blue-400"></p>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-semibold">Next Alarm</p>
+                <p id="nextAlarm" class="text-xl font-mono text-blue-400"></p>
+            </div>
+            <div class="text-center col-span-2">
+                <p class="text-lg font-semibold">Countdown</p>
+                <p id="countdown" class="text-2xl font-mono text-green-400"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create audio objects for soft and regular beeps
+        const softBeep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+        const regularBeep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+
+        // Function to format time as 12-hour HH:MM:SS AM/PM
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { hour12: true });
+        }
+
+        // Function to calculate the next 15-minute mark
+        function getNextAlarmTime() {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            const millisecondsUntilNextQuarter = (15 - (minutes % 15)) * 60 * 1000 - seconds * 1000 - now.getMilliseconds();
+            const nextAlarm = new Date(now.getTime() + millisecondsUntilNextQuarter);
+            return nextAlarm;
+        }
+
+        // Function to format countdown in MM:SS
+        function formatCountdown(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Function to update UI
+        function updateUI() {
+            const now = new Date();
+            const nextAlarm = getNextAlarmTime();
+
+            // Update current time
+            document.getElementById('currentTime').textContent = formatTime(now);
+
+            // Update next alarm time
+            document.getElementById('nextAlarm').textContent = formatTime(nextAlarm);
+
+            // Update countdown
+            const timeUntilNextAlarm = nextAlarm.getTime() - now.getTime();
+            document.getElementById('countdown').textContent = formatCountdown(timeUntilNextAlarm);
+        }
+
+        // Function to check if current time is within alarm conditions
+        function checkAlarm() {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+
+            // Check if it's 1 minute before the 15-minute mark (e.g., 14:00, 29:00, 44:00, 59:00)
+            if ((minutes % 15 === 14 && seconds === 0)) {
+                softBeep.play();
+            }
+
+            // Check if it's within the last 10 seconds of the 15-minute mark (e.g., 14:50-14:59)
+            if ((minutes % 15 === 14 && seconds >= 50)) {
+                // Play beep every 2 seconds (50, 52, 54, 56, 58)
+                if (seconds % 2 === 0) {
+                    regularBeep.play();
+                }
+            }
+        }
+
+        // Update UI and check alarm every second
+        setInterval(() => {
+            updateUI();
+            checkAlarm();
+        }, 1000);
+
+        // Initial update
+        updateUI();
+    </script>
+</body>
+</html>
